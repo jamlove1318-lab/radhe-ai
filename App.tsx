@@ -12,6 +12,12 @@ import { speechEngine } from './src/audio/speechEngine';
 import { MainHudScreen } from './src/screens/MainHudScreen';
 import { CodeStudioScreen } from './src/screens/CodeStudioScreen';
 import { AgentWorkflowScreen } from './src/screens/AgentWorkflowScreen';
+import { ThreeDVisualizerScreen } from './src/screens/ThreeDVisualizerScreen';
+import { NetworkScannerScreen } from './src/screens/NetworkScannerScreen';
+import { DocumentVaultScreen } from './src/screens/DocumentVaultScreen';
+import { VoiceVaultScreen } from './src/screens/VoiceVaultScreen';
+import { TacticalGamesScreen } from './src/screens/TacticalGamesScreen';
+import { ProactiveBriefingScreen } from './src/screens/ProactiveBriefingScreen';
 import { VisionScannerScreen } from './src/screens/VisionScannerScreen';
 import { DebateArenaScreen } from './src/screens/DebateArenaScreen';
 import { DeviceControlScreen } from './src/screens/DeviceControlScreen';
@@ -22,6 +28,12 @@ import {
   Compass,
   Code,
   Workflow,
+  Box,
+  Radio,
+  FolderLock,
+  Volume2,
+  Gamepad2,
+  Sun,
   Scan,
   Swords,
   Cpu,
@@ -29,7 +41,21 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 
-type TabKey = 'hud' | 'code' | 'missions' | 'scanner' | 'debate' | 'device' | 'terminal' | 'settings';
+type TabKey =
+  | 'hud'
+  | 'code'
+  | 'missions'
+  | '3d'
+  | 'network'
+  | 'vault'
+  | 'voice'
+  | 'games'
+  | 'briefing'
+  | 'scanner'
+  | 'debate'
+  | 'device'
+  | 'terminal'
+  | 'settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('hud');
@@ -56,11 +82,17 @@ export default function App() {
     { key: 'hud', label: 'HUD', icon: Compass },
     { key: 'code', label: 'CODE', icon: Code },
     { key: 'missions', label: 'AGENT', icon: Workflow },
-    { key: 'scanner', label: 'SCAN', icon: Scan },
+    { key: '3d', label: '3D CORE', icon: Box },
+    { key: 'network', label: 'NET SCAN', icon: Radio },
+    { key: 'vault', label: 'DOCS', icon: FolderLock },
+    { key: 'voice', label: 'VOICE', icon: Volume2 },
+    { key: 'games', label: 'GAMES', icon: Gamepad2 },
+    { key: 'briefing', label: 'BRIEFING', icon: Sun },
+    { key: 'scanner', label: 'VISION', icon: Scan },
     { key: 'debate', label: 'DUEL', icon: Swords },
-    { key: 'device', label: 'SYS', icon: Cpu },
+    { key: 'device', label: 'SYSTEM', icon: Cpu },
     { key: 'terminal', label: 'CLI', icon: TermIcon },
-    { key: 'settings', label: 'CONF', icon: SettingsIcon },
+    { key: 'settings', label: 'CONFIG', icon: SettingsIcon },
   ];
 
   return (
@@ -68,7 +100,7 @@ export default function App() {
       <SafeAreaView style={[styles.root, { backgroundColor: theme.colors.background }]}>
         <StatusBar style="light" />
 
-        {/* Dynamic Screen View */}
+        {/* Dynamic Active Module View */}
         <View style={styles.screenContainer}>
           {activeTab === 'hud' && (
             <MainHudScreen
@@ -83,6 +115,24 @@ export default function App() {
           )}
           {activeTab === 'missions' && (
             <AgentWorkflowScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === '3d' && (
+            <ThreeDVisualizerScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === 'network' && (
+            <NetworkScannerScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === 'vault' && (
+            <DocumentVaultScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === 'voice' && (
+            <VoiceVaultScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === 'games' && (
+            <TacticalGamesScreen mode={mode} settings={settings} />
+          )}
+          {activeTab === 'briefing' && (
+            <ProactiveBriefingScreen mode={mode} settings={settings} />
           )}
           {activeTab === 'scanner' && (
             <VisionScannerScreen mode={mode} settings={settings} />
