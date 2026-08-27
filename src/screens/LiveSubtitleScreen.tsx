@@ -17,11 +17,11 @@ import {
   Mic,
   MicOff,
   Globe,
-  Sparkles,
-  Volume2,
   Languages,
-  Radio,
   Tag,
+  AlertCircle,
+  CheckCircle2,
+  Volume2,
 } from 'lucide-react-native';
 
 interface LiveSubtitleProps {
@@ -33,16 +33,16 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
   const theme = getThemeForMode(mode);
   const [isListening, setIsListening] = useState(false);
   const [currentLine, setCurrentLine] = useState('');
+  const [micError, setMicError] = useState<string | null>(null);
   const [transcriptHistory, setTranscriptHistory] = useState<string[]>([
-    'JARVIS: "Standing by for live audio subtitle streaming, sir."',
-    'SYSTEM: "Acoustic sensor calibrated for ambient speaker & voice playback."',
+    'JARVIS: "Acoustic sensor calibrated. Ready for real-time speech transcription, sir."',
   ]);
   const [targetLang, setTargetLang] = useState<'EN' | 'ES' | 'FR' | 'DE' | 'HI' | 'JA'>('EN');
   const [detectedKeywords, setDetectedKeywords] = useState<string[]>([
+    'Speech',
     'Acoustic',
-    'Frequency',
     'Real-Time',
-    'Telemetry',
+    'Captions',
   ]);
 
   const supportedLangs = [
@@ -56,20 +56,30 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
 
   const toggleListening = () => {
     soundFx.playHudClick();
+    setMicError(null);
+
     if (isListening) {
       speechEngine.stopListening();
       setIsListening(false);
     } else {
       setCurrentLine('');
       speechEngine.registerCallbacks({
-        onStateChange: () => {},
-        onTranscript: (txt) => {
+        onStateChange: (state) => {
+          if (state === 'listening') setIsListening(true);
+        },
+        onTranscript: (txt, isFinal) => {
           setCurrentLine(txt);
           extractKeywords(txt);
+          if (isFinal && txt.trim().length > 0) {
+            setTranscriptHistory((prev) => [txt.trim(), ...prev].slice(0, 30));
+          }
         },
-        onError: () => {},
+        onError: (err) => {
+          setMicError(err);
+        },
       });
-      speechEngine.startListening();
+
+      speechEngine.startListening(true);
       setIsListening(true);
       soundFx.playTargetLock();
     }
@@ -78,21 +88,13 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
   const extractKeywords = (text: string) => {
     const words = text
       .split(/\s+/)
-      .filter((w) => w.length > 5)
-      .slice(0, 6);
+      .map((w) => w.replace(/[^a-zA-Z]/g, ''))
+      .filter((w) => w.length > 4)
+      .slice(0, 5);
     if (words.length > 0) {
       setDetectedKeywords((prev) => Array.from(new Set([...words, ...prev])).slice(0, 8));
     }
   };
-
-  useEffect(() => {
-    if (currentLine && currentLine.trim().length > 0) {
-      const timer = setTimeout(() => {
-        setTranscriptHistory((prev) => [currentLine, ...prev].slice(0, 20));
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [currentLine]);
 
   return (
     <IronManHudOverlay mode={mode}>
@@ -102,13 +104,23 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
           <View style={styles.headerIconRow}>
             <Captions size={20} color="#00F0FF" />
             <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-              LIVE AUDIO HUD SUBTITLES & TRANSCRIBER
+              REAL-TIME ACOUSTIC SUBTITLE STREAM
             </Text>
           </View>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-            Real-Time Ambient & Speaker Audio Subtitling with Dynamic Multi-Language HUD
+            Continuous Live Microphone Dictation, Spoken Audio Transcripts & Translation
           </Text>
         </View>
+
+        {/* Mic Error Banner if permission needed */}
+        {micError && (
+          <View style={[styles.errorCard, { borderColor: theme.colors.danger }]}>
+            <AlertCircle size={16} color={theme.colors.danger} />
+            <Text style={[styles.errorText, { color: theme.colors.danger }]}>
+              {micError}
+            </Text>
+          </View>
+        )}
 
         {/* Translation Language Selector */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
@@ -151,7 +163,7 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
           style={[
             styles.subtitleViewport,
             {
-              borderColor: isListening ? '#00F0FF' : theme.colors.border,
+              borderColor: isListening ? '#00FFA3' : theme.colors.border,
               backgroundColor: '#010611',
             },
           ]}
@@ -166,7 +178,7 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
                 ]}
               />
               <Text style={[styles.statusText, { color: isListening ? '#00FFA3' : '#5A6F87' }]}>
-                {isListening ? 'STREAMING AUDIO' : 'ACOUSTIC SENSOR STANDBY'}
+                {isListening ? 'MICROPHONE ACTIVE • TRANSCRIBING LIVE SPEECH' : 'ACOUSTIC SENSOR STANDBY'}
               </Text>
             </View>
             <Text style={[styles.langBadge, { color: theme.colors.primary }]}>
@@ -176,15 +188,15 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
 
           {/* Active Floating Subtitle Line */}
           <View style={styles.activeLineContainer}>
-            <Text style={[styles.activeSubtitleText, { color: '#00F0FF' }]}>
-              {currentLine || (isListening ? 'Listening for dialogue and speech...' : 'Press Start Live Subtitles below to begin.')}
+            <Text style={[styles.activeSubtitleText, { color: isListening ? '#00F0FF' : '#5A6F87' }]}>
+              {currentLine || (isListening ? '🎙️ Listening... Speak into your microphone now' : 'Press Start Live Subtitles below to begin.')}
             </Text>
           </View>
         </View>
 
         {/* Live Action Controls */}
         <HolographicButton
-          title={isListening ? 'Stop Live Subtitle Stream' : 'Start Live Audio Subtitles'}
+          title={isListening ? 'Stop Live Subtitles' : 'Start Live Audio Subtitles'}
           mode={mode}
           variant={isListening ? 'danger' : 'primary'}
           onPress={toggleListening}
@@ -196,7 +208,7 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
           <View style={styles.cardHeaderRow}>
             <Tag size={13} color={theme.colors.accent} />
             <Text style={[styles.cardTitle, { color: theme.colors.accent }]}>
-              ACOUSTIC KEYWORD & ENTITY RADAR:
+              DETECTED ENTITY & KEYWORD RADAR:
             </Text>
           </View>
           <View style={styles.chipWrap}>
@@ -210,7 +222,7 @@ export const LiveSubtitleScreen: React.FC<LiveSubtitleProps> = ({ mode }) => {
 
         {/* Subtitle Dialogue History Log */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-          DIALOGUE TRANSCRIPT BUFFER:
+          LIVE DIALOGUE TRANSCRIPT BUFFER:
         </Text>
         <View style={styles.historyList}>
           {transcriptHistory.map((item, index) => (
@@ -264,6 +276,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'monospace',
     textAlign: 'center',
+  },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 0, 60, 0.1)',
+  },
+  errorText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 10,
