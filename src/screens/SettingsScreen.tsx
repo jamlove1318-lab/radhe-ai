@@ -116,43 +116,28 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
     }
 
     if (!key || key.length < 4) {
-      setTestResult(`⚠️ [${activeProvider} NOT CONFIGURED] Please enter your API Key in the field above before testing.`);
+      setTestResult(`⚠️ [${activeProvider} NOT CONFIGURED]\nPlease paste your ${activeProvider} API key in the input box above first.`);
       setIsTesting(false);
       return;
     }
 
-    const tempSettings: AppSettings = {
-      ...settings,
-      activeProvider,
-      geminiApiKey: geminiKey.trim(),
-      openaiApiKey: openaiKey.trim(),
-      groqApiKey: groqKey.trim(),
-      cerebrasApiKey: cerebrasKey.trim(),
-      openrouterApiKey: openrouterKey.trim(),
-      opencodeZenApiKey: opencodeZenKey.trim(),
-      opencodeZenBaseUrl: opencodeZenBaseUrl.trim(),
-      customModel: customModel.trim(),
-      autoFailoverEnabled: autoFailover,
-      preferFreeTier: preferFree,
-    };
-
     try {
-      const response = await MultiProviderClient.generateResponse(
-        'Ping test: Respond with exactly "Link confirmed and fully operational."',
-        [],
-        mode,
-        tempSettings
+      const res = await MultiProviderClient.testProviderDirectly(
+        activeProvider,
+        key,
+        customModel.trim(),
+        opencodeZenBaseUrl.trim()
       );
 
-      if (response.includes('[Notice: Cloud API link encountered') || response.includes('unconfigured') || response.includes('offline')) {
-        setTestResult(`❌ [${activeProvider} CONNECTION FAILED]\n${response}`);
-        soundFx.playAlert();
-      } else {
-        setTestResult(`✓ [${activeProvider} LINK VERIFIED]\n"${response.trim()}"`);
+      if (res.success) {
+        setTestResult(`✓ [${activeProvider} CONNECTED]\n${res.message}`);
         soundFx.playTargetLock();
+      } else {
+        setTestResult(`❌ [${activeProvider} CONNECTION FAILED]\n${res.message}`);
+        soundFx.playAlert();
       }
     } catch (e: any) {
-      setTestResult(`❌ [${activeProvider} ERROR] ${e.message}`);
+      setTestResult(`❌ [${activeProvider} ERROR]\n${e.message}`);
       soundFx.playAlert();
     } finally {
       setIsTesting(false);
@@ -246,6 +231,9 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
               <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
                 Google Gemini API Key (Gemini 2.0 Flash / Pro)
               </Text>
+              <Text style={[styles.helpUrl, { color: theme.colors.accent }]}>
+                🔑 Get Free Key: aistudio.google.com/app/apikey
+              </Text>
               <TextInput
                 style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
                 placeholder="AIzaSy..."
@@ -263,6 +251,9 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
               <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
                 OpenAI API Key (GPT-4o, GPT-4o Mini, o1)
               </Text>
+              <Text style={[styles.helpUrl, { color: theme.colors.accent }]}>
+                🔑 Get Key: platform.openai.com/api-keys
+              </Text>
               <TextInput
                 style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
                 placeholder="sk-proj-..."
@@ -278,7 +269,10 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
           {activeProvider === 'GROQ' && (
             <>
               <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
-                Groq Cloud API Key (LPU Ultra-Fast Inference)
+                Groq Cloud API Key (500+ tok/s Ultra Fast)
+              </Text>
+              <Text style={[styles.helpUrl, { color: theme.colors.accent }]}>
+                🔑 Get 100% Free Key: console.groq.com/keys
               </Text>
               <TextInput
                 style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
@@ -295,7 +289,10 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
           {activeProvider === 'CEREBRAS' && (
             <>
               <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
-                Cerebras API Key (Wafer-Scale Engine)
+                Cerebras API Key (Wafer-Scale AI)
+              </Text>
+              <Text style={[styles.helpUrl, { color: theme.colors.accent }]}>
+                🔑 Get Free Key: cloud.cerebras.ai
               </Text>
               <TextInput
                 style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
@@ -313,6 +310,9 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
             <>
               <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
                 OpenRouter API Key (Claude 3.5, DeepSeek R1, Llama 3.3)
+              </Text>
+              <Text style={[styles.helpUrl, { color: theme.colors.accent }]}>
+                🔑 Get Free Key: openrouter.ai/keys
               </Text>
               <TextInput
                 style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
@@ -617,6 +617,11 @@ const styles = StyleSheet.create({
   cardDesc: {
     fontSize: 10,
     lineHeight: 14,
+  },
+  helpUrl: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    marginVertical: 2,
   },
   apiKeyInput: {
     height: 38,

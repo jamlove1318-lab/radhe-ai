@@ -41,6 +41,58 @@ export const SUPPORTED_MODELS: Record<LLMProvider, ProviderModelOption[]> = {
 };
 
 export class MultiProviderClient {
+  public static async testProviderDirectly(
+    provider: LLMProvider,
+    apiKey: string,
+    model?: string,
+    baseUrl?: string
+  ): Promise<{ success: boolean; message: string }> {
+    if (!apiKey || apiKey.trim().length < 4) {
+      return {
+        success: false,
+        message: `No API key entered for ${provider}. Please paste your key in the box above.`,
+      };
+    }
+
+    const testPrompt = 'Ping test: respond in exactly 5 words confirming link.';
+    const dummyHistory: any[] = [];
+    const mode: PersonaMode = 'JARVIS';
+    const targetModel = model || this.getDefaultModel(provider);
+
+    try {
+      let reply = '';
+      if (provider === 'GEMINI') {
+        reply = await this.callGemini(testPrompt, dummyHistory, mode, apiKey, targetModel);
+      } else if (provider === 'OPENAI') {
+        reply = await this.callOpenAI(testPrompt, dummyHistory, mode, apiKey, targetModel);
+      } else if (provider === 'GROQ') {
+        reply = await this.callOpenAICompatible('https://api.groq.com/openai/v1', apiKey, targetModel, testPrompt, dummyHistory, mode);
+      } else if (provider === 'CEREBRAS') {
+        reply = await this.callOpenAICompatible('https://api.cerebras.ai/v1', apiKey, targetModel, testPrompt, dummyHistory, mode);
+      } else if (provider === 'OPENROUTER') {
+        reply = await this.callOpenRouter(apiKey, targetModel, testPrompt, dummyHistory, mode);
+      } else if (provider === 'OPENCODE_ZEN') {
+        reply = await this.callOpenAICompatible(baseUrl || 'https://api.opencode.zen/v1', apiKey, targetModel, testPrompt, dummyHistory, mode);
+      }
+
+      if (reply && reply.trim().length > 0) {
+        return {
+          success: true,
+          message: `Link verified on ${provider} (${targetModel})!\nResponse: "${reply.trim().substring(0, 80)}"`,
+        };
+      }
+      return {
+        success: false,
+        message: `Empty response received from ${provider}. Check model identifier.`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Error connecting to ${provider}: ${err.message}`,
+      };
+    }
+  }
+
   public static async generateResponse(
     prompt: string,
     history: Array<{ role: 'user' | 'model' | 'assistant'; parts: string }>,
@@ -119,7 +171,6 @@ export class MultiProviderClient {
         }
 
         if (result && result.trim().length > 0) {
-          // If failover occurred from a different provider, optionally prefix subtle status
           if (provider !== primaryProvider) {
             return `[Auto-Failover Active: Answered via ${provider} (${defaultModel})]\n\n${result.trim()}`;
           }
@@ -128,7 +179,6 @@ export class MultiProviderClient {
       } catch (err: any) {
         console.warn(`[MultiProvider] Provider ${provider} error: ${err.message}. Initiating sequential failover to next provider...`);
         lastError = `${provider}: ${err.message}`;
-        // Automatically cascades to next provider in loop
       }
     }
 
@@ -136,8 +186,12 @@ export class MultiProviderClient {
     return this.generateSimulatedFallback(prompt, mode, primaryProvider, lastError);
   }
 
+  public static getDefaultModel(provider: LLMProvider): string {
+    return SUPPORTED_MODELS[provider]?.[0]?.id || 'gemini-2.0-flash';
+  }
+
   private static getOptimalModel(provider: LLMProvider, settings: AppSettings): string {
-    if (settings.customModel && settings.customModel.trim().length > 0) {
+    if (settings.customModel && settings.customModel.trim().length > 0 && settings.activeProvider === provider) {
       return settings.customModel.trim();
     }
     const models = SUPPORTED_MODELS[provider] || [];
