@@ -105,6 +105,22 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
     setIsTesting(true);
     setTestResult(null);
 
+    let key = '';
+    switch (activeProvider) {
+      case 'GEMINI': key = geminiKey.trim(); break;
+      case 'OPENAI': key = openaiKey.trim(); break;
+      case 'GROQ': key = groqKey.trim(); break;
+      case 'CEREBRAS': key = cerebrasKey.trim(); break;
+      case 'OPENROUTER': key = openrouterKey.trim(); break;
+      case 'OPENCODE_ZEN': key = opencodeZenKey.trim(); break;
+    }
+
+    if (!key || key.length < 4) {
+      setTestResult(`⚠️ [${activeProvider} NOT CONFIGURED] Please enter your API Key in the field above before testing.`);
+      setIsTesting(false);
+      return;
+    }
+
     const tempSettings: AppSettings = {
       ...settings,
       activeProvider,
@@ -116,19 +132,28 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
       opencodeZenApiKey: opencodeZenKey.trim(),
       opencodeZenBaseUrl: opencodeZenBaseUrl.trim(),
       customModel: customModel.trim(),
+      autoFailoverEnabled: autoFailover,
+      preferFreeTier: preferFree,
     };
 
     try {
       const response = await MultiProviderClient.generateResponse(
-        'Ping test: Respond in exactly 8 words confirming link.',
+        'Ping test: Respond with exactly "Link confirmed and fully operational."',
         [],
         mode,
         tempSettings
       );
-      setTestResult(`[${activeProvider} CONNECTED] ${response.substring(0, 100)}`);
-      soundFx.playTargetLock();
+
+      if (response.includes('[Notice: Cloud API link encountered') || response.includes('unconfigured') || response.includes('offline')) {
+        setTestResult(`❌ [${activeProvider} CONNECTION FAILED]\n${response}`);
+        soundFx.playAlert();
+      } else {
+        setTestResult(`✓ [${activeProvider} LINK VERIFIED]\n"${response.trim()}"`);
+        soundFx.playTargetLock();
+      }
     } catch (e: any) {
-      setTestResult(`[${activeProvider} ERROR] ${e.message}`);
+      setTestResult(`❌ [${activeProvider} ERROR] ${e.message}`);
+      soundFx.playAlert();
     } finally {
       setIsTesting(false);
     }
