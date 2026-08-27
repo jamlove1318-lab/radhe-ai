@@ -23,15 +23,6 @@ export const IronManHudOverlay: React.FC<HudOverlayProps> = ({ mode, children })
 
   return (
     <View style={styles.container}>
-      {/* Top Left Bracket */}
-      <View style={[styles.cornerTL, { borderColor: theme.colors.primary }]} />
-      {/* Top Right Bracket */}
-      <View style={[styles.cornerTR, { borderColor: theme.colors.primary }]} />
-      {/* Bottom Left Bracket */}
-      <View style={[styles.cornerBL, { borderColor: theme.colors.primary }]} />
-      {/* Bottom Right Bracket */}
-      <View style={[styles.cornerBR, { borderColor: theme.colors.primary }]} />
-
       {/* Top HUD Telemetry Ribbon */}
       <View style={[styles.topRibbon, { borderBottomColor: theme.colors.border }]}>
         <Text style={[styles.telemetryText, { color: theme.colors.textSecondary }]}>
@@ -45,7 +36,7 @@ export const IronManHudOverlay: React.FC<HudOverlayProps> = ({ mode, children })
         </Text>
       </View>
 
-      {/* Background Tech Watermark */}
+      {/* Main Content Area */}
       <View style={styles.content}>{children}</View>
     </View>
   );
@@ -58,50 +49,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  cornerTL: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    zIndex: 10,
-    pointerEvents: 'none',
-  },
-  cornerTR: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    zIndex: 10,
-    pointerEvents: 'none',
-  },
-  cornerBL: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    zIndex: 10,
-    pointerEvents: 'none',
-  },
-  cornerBR: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    zIndex: 10,
-    pointerEvents: 'none',
   },
   topRibbon: {
     flexDirection: 'row',

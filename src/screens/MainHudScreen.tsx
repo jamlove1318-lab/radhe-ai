@@ -221,13 +221,7 @@ export const MainHudScreen: React.FC<MainHudProps> = ({
     }
   };
 
-  const quickCommands = [
-    { label: 'Check Tokyo Weather', cmd: 'What is the weather in Tokyo?' },
-    { label: 'Live BTC Price', cmd: 'Get the latest Bitcoin BTC price and volume' },
-    { label: 'Execute Fibonacci Code', cmd: 'Run a JavaScript script to calculate Fibonacci sequence' },
-    { label: 'Compute Trajectory', cmd: 'Calculate Math.sqrt(2048) * 16.5' },
-    { label: 'System Diagnostics', cmd: 'Run complete system diagnostics' },
-  ];
+
 
   return (
     <IronManHudOverlay mode={mode}>
@@ -317,29 +311,6 @@ export const MainHudScreen: React.FC<MainHudProps> = ({
             {theme.tagline}
           </Text>
         </View>
-
-        {/* Quick Tactical Command Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickCommandRow}
-        >
-          {quickCommands.map((qc, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => handleSendMessage(qc.cmd)}
-              style={[
-                styles.quickChip,
-                { borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-              ]}
-            >
-              <Zap size={11} color={theme.colors.primary} />
-              <Text style={[styles.quickChipText, { color: theme.colors.textPrimary }]}>
-                {qc.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         {/* Tactical Feed / Chat Transcript */}
         <ScrollView
