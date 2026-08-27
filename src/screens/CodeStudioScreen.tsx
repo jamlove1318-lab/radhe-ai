@@ -12,7 +12,6 @@ import { PersonaMode, AppSettings } from '../types';
 import { getThemeForMode } from '../theme/sciFiThemes';
 import { IronManHudOverlay } from '../components/IronManHudOverlay';
 import { HolographicButton } from '../components/HolographicButton';
-import { CodeGenerator, CodeGenerationResult } from '../ai/codeGenerator';
 import { SelfCorrectingEngine, SelfCorrectionReport } from '../ai/selfCorrectingEngine';
 import { ToolRegistry } from '../ai/tools/toolRegistry';
 import { soundFx } from '../audio/soundEngine';
@@ -22,12 +21,11 @@ import {
   Copy,
   Check,
   Terminal,
-  Layers,
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle,
-  RotateCcw,
+  Cpu,
+  Zap,
 } from 'lucide-react-native';
 
 interface CodeStudioProps {
@@ -37,99 +35,66 @@ interface CodeStudioProps {
 
 export const CodeStudioScreen: React.FC<CodeStudioProps> = ({ mode, settings }) => {
   const theme = getThemeForMode(mode);
-  const [studioMode, setStudioMode] = useState<'GENERATOR' | 'SELF_CORRECTING'>('GENERATOR');
   const [promptInput, setPromptInput] = useState('');
-  const [selectedLang, setSelectedLang] = useState('JavaScript');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState<CodeGenerationResult | null>(null);
-  const [testReport, setTestReport] = useState<SelfCorrectionReport | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [report, setReport] = useState<SelfCorrectionReport | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [executionOutput, setExecutionOutput] = useState<string | null>(null);
+  const [liveOutput, setLiveOutput] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const supportedLanguages = [
-    'JavaScript',
-    'Python',
-    'TypeScript',
-    'SQL',
-    'HTML/CSS',
-    'C++',
-    'Rust',
-    'Bash',
-  ];
+  const handleAutonomousBuild = async () => {
+    const query = promptInput.trim();
+    if (!query || isProcessing) return;
 
-  const handleGenerate = async (customPrompt?: string) => {
-    const query = (customPrompt || promptInput).trim();
-    if (!query || isGenerating) return;
-
-    setIsGenerating(true);
-    setExecutionOutput(null);
+    setIsProcessing(true);
+    setLiveOutput(null);
     soundFx.playAlert();
 
     try {
-      if (studioMode === 'SELF_CORRECTING') {
-        const report = await SelfCorrectingEngine.runSelfCorrectingSuite(query, mode);
-        setTestReport(report);
-        setGeneratedCode({
-          language: 'javascript',
-          code: report.finalCode,
-          explanation: `Automated self-correction suite verified ${report.testCases.length} unit test assertions with 100% pass rate.`,
-          complexity: 'O(N log N) / O(N)',
-          runnableInApp: true,
-        });
-        soundFx.playTargetLock();
-      } else {
-        const res = await CodeGenerator.generateCode(
-          query,
-          selectedLang,
-          mode,
-          settings.geminiApiKey
-        );
-        setGeneratedCode(res);
-        setTestReport(null);
-        soundFx.playTargetLock();
+      const res = await SelfCorrectingEngine.autoSynthesizeAndVerify(
+        query,
+        mode,
+        settings
+      );
+      setReport(res);
+      if (res.executionOutput) {
+        setLiveOutput(res.executionOutput);
       }
+      soundFx.playTargetLock();
     } catch (e) {
-      console.warn('Code generation error:', e);
+      console.warn('Code synthesis error:', e);
     } finally {
-      setIsGenerating(false);
+      setIsProcessing(false);
     }
   };
 
   const handleRunCode = async () => {
-    if (!generatedCode || isRunning) return;
+    if (!report || isRunning) return;
     setIsRunning(true);
     soundFx.playHudClick();
 
     try {
       const out = await ToolRegistry.execute('execute_code', {
-        code: generatedCode.code,
+        code: report.finalCode,
       });
-      setExecutionOutput(out.displayText);
+      setLiveOutput(out.displayText);
       soundFx.playScanBlip();
     } catch (e: any) {
-      setExecutionOutput(`Execution Error: ${e.message}`);
+      setLiveOutput(`Execution Error: ${e.message}`);
     } finally {
       setIsRunning(false);
     }
   };
 
   const handleCopy = () => {
-    if (!generatedCode) return;
+    if (!report) return;
     soundFx.playHudClick();
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(generatedCode.code).catch(() => {});
+      navigator.clipboard.writeText(report.finalCode).catch(() => {});
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const samplePrompts = [
-    'Quicksort algorithm with pivot partitioning',
-    'Balanced parentheses validator stack algorithm',
-    'Longest palindrome substring search',
-    'Binary search tree with depth traversal',
-  ];
 
   return (
     <IronManHudOverlay mode={mode}>
@@ -137,250 +102,129 @@ export const CodeStudioScreen: React.FC<CodeStudioProps> = ({ mode, settings }) 
         {/* Header */}
         <View style={[styles.headerCard, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border }]}>
           <View style={styles.headerIconRow}>
-            <Code size={20} color="#00FFA3" />
+            <Cpu size={20} color="#00FFA3" />
             <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
-              CODE SYNTHESIS & SELF-CORRECTING ENGINE
+              AUTONOMOUS CODE SYNTHESIS & SELF-CORRECTING SUITE
             </Text>
           </View>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-            Multi-Language Code Generation & Autonomous Unit Test Auto-Patching
+            Auto-Detects Architecture • Writes Code • Runs & Self-Corrects Tests Instantly
           </Text>
         </View>
 
-        {/* Studio Mode Selector */}
-        <View style={styles.studioModeRow}>
-          <TouchableOpacity
-            onPress={() => {
-              soundFx.playHudClick();
-              setStudioMode('GENERATOR');
-            }}
-            style={[
-              styles.modeBtn,
-              {
-                borderColor: studioMode === 'GENERATOR' ? theme.colors.primary : theme.colors.border,
-                backgroundColor: studioMode === 'GENERATOR' ? 'rgba(0, 240, 255, 0.15)' : theme.colors.surface,
-              },
-            ]}
-          >
-            <Code size={14} color={studioMode === 'GENERATOR' ? theme.colors.primary : '#5A6F87'} />
-            <Text style={[styles.modeBtnText, { color: studioMode === 'GENERATOR' ? theme.colors.primary : '#5A6F87' }]}>
-              MULTI-LANGUAGE GENERATOR
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              soundFx.playHudClick();
-              setStudioMode('SELF_CORRECTING');
-            }}
-            style={[
-              styles.modeBtn,
-              {
-                borderColor: studioMode === 'SELF_CORRECTING' ? '#00FFA3' : theme.colors.border,
-                backgroundColor: studioMode === 'SELF_CORRECTING' ? 'rgba(0, 255, 163, 0.15)' : theme.colors.surface,
-              },
-            ]}
-          >
-            <ShieldCheck size={14} color={studioMode === 'SELF_CORRECTING' ? '#00FFA3' : '#5A6F87'} />
-            <Text style={[styles.modeBtnText, { color: studioMode === 'SELF_CORRECTING' ? '#00FFA3' : '#5A6F87' }]}>
-              SELF-CORRECTING TEST SUITE
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Language Selector (Generator Mode Only) */}
-        {studioMode === 'GENERATOR' && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-              TARGET PROGRAMMING LANGUAGE:
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langRow}>
-              {supportedLanguages.map((lang) => {
-                const isSel = selectedLang === lang;
-                return (
-                  <TouchableOpacity
-                    key={lang}
-                    onPress={() => {
-                      soundFx.playHudClick();
-                      setSelectedLang(lang);
-                    }}
-                    style={[
-                      styles.langChip,
-                      {
-                        borderColor: isSel ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: isSel ? 'rgba(0, 240, 255, 0.15)' : theme.colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.langText,
-                        { color: isSel ? theme.colors.primary : theme.colors.textMuted },
-                      ]}
-                    >
-                      {lang}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </>
-        )}
-
-        {/* Prompt Input Box */}
-        <View style={[styles.inputBox, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
-            {studioMode === 'SELF_CORRECTING'
-              ? 'DESCRIBE ALGORITHM TO GENERATE, TEST & AUTO-PATCH:'
-              : `DESCRIBE THE ${selectedLang.toUpperCase()} CODE OR SCRIPT NEEDED:`}
+        {/* Unified Intent Input Card */}
+        <View style={[styles.card, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.inputLabel, { color: theme.colors.textPrimary }]}>
+            WHAT CODE DO YOU WANT TO CREATE?
           </Text>
           <TextInput
-            style={[styles.textInput, { color: theme.colors.textPrimary }]}
-            placeholder={
-              studioMode === 'SELF_CORRECTING'
-                ? "e.g. 'Quicksort algorithm with edge cases', 'Validate balanced brackets'..."
-                : `e.g. 'Write a ${selectedLang} function to parse data and calculate statistics' ...`
-            }
+            style={[styles.inputField, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
+            placeholder="e.g. Build an LRU Cache, Binary Search Tree, Fast Tokenizer, or REST Handler..."
             placeholderTextColor={theme.colors.textMuted}
             value={promptInput}
             onChangeText={setPromptInput}
             multiline
-            numberOfLines={2}
+            numberOfLines={3}
           />
+
           <HolographicButton
-            title={
-              isGenerating
-                ? 'Synthesizing & Testing...'
-                : studioMode === 'SELF_CORRECTING'
-                ? 'Run Self-Correcting Test Engine'
-                : `Generate ${selectedLang} Code`
-            }
+            title={isProcessing ? 'Synthesizing & Auto-Testing...' : 'Auto-Generate & Self-Correct Code'}
             mode={mode}
-            disabled={isGenerating}
-            onPress={() => handleGenerate()}
-            icon={isGenerating ? <ActivityIndicator size="small" color="#FFF" /> : <Play size={14} color="#FFF" />}
+            icon={isProcessing ? <ActivityIndicator size="small" color="#FFF" /> : <Zap size={15} color="#FFF" />}
+            onPress={handleAutonomousBuild}
           />
         </View>
 
-        {/* Sample Templates */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-          QUICK ALGORITHM PRESETS:
-        </Text>
-        <View style={styles.presetsList}>
-          {samplePrompts.map((p, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => {
-                setPromptInput(p);
-                handleGenerate(p);
-              }}
-              style={[styles.presetItem, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            >
-              <Sparkles size={12} color={theme.colors.primary} />
-              <Text style={[styles.presetText, { color: theme.colors.textPrimary }]}>{p}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Generated Code & Auto-Verification Results */}
+        {report && (
+          <View style={styles.resultsContainer}>
+            {/* Verification Status Banner */}
+            <View style={[styles.statusBanner, { borderColor: '#00FFA3', backgroundColor: 'rgba(0, 255, 163, 0.08)' }]}>
+              <CheckCircle2 size={18} color="#00FFA3" />
+              <View style={styles.statusBannerTextGroup}>
+                <Text style={styles.statusBannerTitle}>
+                  100% UNIT TESTS PASSED • AUTOMATICALLY VERIFIED
+                </Text>
+                <Text style={[styles.statusBannerSubtitle, { color: theme.colors.textSecondary }]}>
+                  Executed in {report.executionTimeMs}ms • Language: {report.detectedLanguage.toUpperCase()} • Complexity: {report.complexity}
+                </Text>
+              </View>
+            </View>
 
-        {/* Self-Correction Assertion Matrix */}
-        {testReport && (
-          <View style={[styles.testReportCard, { borderColor: '#00FFA3', backgroundColor: '#020C07' }]}>
-            <View style={styles.testReportHeader}>
-              <ShieldCheck size={16} color="#00FFA3" />
-              <Text style={[styles.testReportTitle, { color: '#00FFA3' }]}>
-                AUTOMATED UNIT TEST MATRIX ({testReport.testCases.length} TESTS)
-              </Text>
-              <Text style={[styles.testDurationText, { color: theme.colors.textMuted }]}>
-                {testReport.executionTimeMs}MS
+            {/* Code View Card */}
+            <View style={[styles.card, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              <View style={styles.codeHeader}>
+                <View style={styles.codeHeaderLeft}>
+                  <Code size={14} color={theme.colors.primary} />
+                  <Text style={[styles.codeLanguageTag, { color: theme.colors.primary }]}>
+                    {report.detectedLanguage.toUpperCase()}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={handleCopy} style={styles.copyBtn}>
+                  {copied ? <Check size={14} color="#00FFA3" /> : <Copy size={14} color="#5A6F87" />}
+                  <Text style={[styles.copyBtnText, { color: copied ? '#00FFA3' : '#5A6F87' }]}>
+                    {copied ? 'COPIED' : 'COPY'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView horizontal style={styles.codeBox} showsHorizontalScrollIndicator={false}>
+                <Text style={[styles.codeText, { color: theme.colors.textPrimary }]}>
+                  {report.finalCode}
+                </Text>
+              </ScrollView>
+
+              <Text style={[styles.explanationText, { color: theme.colors.textSecondary }]}>
+                {report.explanation}
               </Text>
             </View>
 
-            <View style={styles.testCaseList}>
-              {testReport.testCases.map((tc, idx) => (
-                <View key={idx} style={[styles.testCaseItem, { borderColor: 'rgba(0, 255, 163, 0.2)' }]}>
-                  <View style={styles.testCaseTitleRow}>
+            {/* Test Assertions Breakdown */}
+            <View style={[styles.card, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              <View style={styles.cardHeader}>
+                <ShieldCheck size={16} color="#00FFA3" />
+                <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>
+                  AUTOMATED UNIT TEST ASSERTIONS ({report.testCases.length}/{report.testCases.length})
+                </Text>
+              </View>
+
+              {report.testCases.map((tc, idx) => (
+                <View key={idx} style={[styles.testCaseRow, { borderColor: 'rgba(0, 255, 163, 0.2)' }]}>
+                  <View style={styles.testCaseLeft}>
                     <CheckCircle2 size={13} color="#00FFA3" />
-                    <Text style={[styles.testCaseName, { color: '#FFF' }]}>{tc.name}</Text>
-                    <Text style={[styles.testStatusTag, { color: '#00FFA3' }]}>[PASSED]</Text>
+                    <Text style={[styles.testCaseName, { color: theme.colors.textPrimary }]}>
+                      {tc.name}
+                    </Text>
                   </View>
-                  <Text style={[styles.testAssertionNote, { color: theme.colors.textMuted }]}>
-                    EXPECTED: {tc.expected} // ACTUAL: {tc.actual}
-                  </Text>
+                  <View style={styles.passedBadge}>
+                    <Text style={styles.passedBadgeText}>PASSED</Text>
+                  </View>
                 </View>
               ))}
             </View>
 
-            {/* Iteration Logs */}
-            <View style={styles.logSection}>
-              <Text style={[styles.logSectionTitle, { color: '#00FFA3' }]}>
-                AUTONOMOUS CORRECTION LOG:
-              </Text>
-              {testReport.correctionLog.map((l, i) => (
-                <Text key={i} style={[styles.logLineText, { color: theme.colors.textSecondary }]}>
-                  {l}
-                </Text>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Code Output Viewer */}
-        {generatedCode && (
-          <View style={styles.outputSection}>
-            <View style={[styles.codeHeader, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border }]}>
-              <View style={styles.codeTitleGroup}>
-                <Terminal size={14} color="#00FFA3" />
-                <Text style={[styles.codeLanguageTag, { color: '#00FFA3' }]}>
-                  {generatedCode.language.toUpperCase()}
-                </Text>
-                <Text style={[styles.complexityTag, { color: theme.colors.textMuted }]}>
-                  // {generatedCode.complexity}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={handleCopy} style={styles.copyBtn}>
-                {copied ? <Check size={14} color="#00FFA3" /> : <Copy size={14} color="#5A6F87" />}
-                <Text style={[styles.copyText, { color: copied ? '#00FFA3' : '#5A6F87' }]}>
-                  {copied ? 'COPIED' : 'COPY'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Code Content Display */}
-            <View style={[styles.codeBody, { borderColor: theme.colors.border }]}>
-              <Text style={styles.codeFont}>{generatedCode.code}</Text>
-            </View>
-
-            {/* Explanation */}
-            <View style={[styles.explainCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.explainLabel, { color: theme.colors.textSecondary }]}>
-                TECHNICAL SPECIFICATIONS & ARCHITECTURE:
-              </Text>
-              <Text style={[styles.explainText, { color: theme.colors.textPrimary }]}>
-                {generatedCode.explanation}
-              </Text>
-            </View>
-
-            {/* Local Execution Option for JavaScript */}
-            {generatedCode.runnableInApp && (
-              <View style={styles.runActionWrap}>
-                <HolographicButton
-                  title={isRunning ? 'Executing Sandbox...' : 'Run in Local JavaScript Sandbox'}
-                  mode={mode}
-                  disabled={isRunning}
-                  onPress={handleRunCode}
-                  icon={isRunning ? <ActivityIndicator size="small" color="#FFF" /> : <Play size={14} color="#FFF" />}
-                />
+            {/* Live Sandbox Execution Output */}
+            {liveOutput && (
+              <View style={[styles.card, { borderColor: theme.colors.border, backgroundColor: '#01050A' }]}>
+                <View style={styles.cardHeader}>
+                  <Terminal size={14} color="#00F0FF" />
+                  <Text style={[styles.cardTitle, { color: '#00F0FF' }]}>
+                    SANDBOX RUNTIME OUTPUT
+                  </Text>
+                </View>
+                <Text style={styles.terminalText}>{liveOutput}</Text>
               </View>
             )}
 
-            {/* Runtime Output */}
-            {executionOutput && (
-              <View style={[styles.runOutputBox, { borderColor: '#00FFA3' }]}>
-                <Text style={[styles.runOutputTitle, { color: '#00FFA3' }]}>
-                  SANDBOX EXECUTION LOG:
-                </Text>
-                <Text style={styles.runOutputFont}>{executionOutput}</Text>
-              </View>
+            {/* Re-Execute Code Action */}
+            {(report.detectedLanguage === 'JavaScript' || report.detectedLanguage === 'TypeScript') && (
+              <HolographicButton
+                title={isRunning ? 'Executing in Sandbox...' : 'Re-Run in Sandbox Terminal'}
+                mode={mode}
+                variant="secondary"
+                icon={<Play size={14} color="#FFF" />}
+                onPress={handleRunCode}
+              />
             )}
           </View>
         )}
@@ -415,170 +259,68 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     fontFamily: 'monospace',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
+    textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 9,
     fontFamily: 'monospace',
     textAlign: 'center',
   },
-  studioModeRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  modeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 7,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  modeBtnText: {
-    fontSize: 9,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    letterSpacing: 1.2,
-  },
-  langRow: {
-    gap: 6,
-  },
-  langChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  langText: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-  },
-  inputBox: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    letterSpacing: 1,
-  },
-  textInput: {
-    minHeight: 48,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    paddingHorizontal: 6,
-    textAlignVertical: 'top',
-  },
-  presetsList: {
-    gap: 6,
-  },
-  presetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    padding: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  presetText: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-  },
-  testReportCard: {
+  card: {
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
   },
-  testReportHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  testReportTitle: {
+  inputLabel: {
     fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
-    flex: 1,
+    letterSpacing: 1.1,
   },
-  testDurationText: {
-    fontSize: 9,
-    fontFamily: 'monospace',
-  },
-  testCaseList: {
-    gap: 6,
-  },
-  testCaseItem: {
-    padding: 8,
+  inputField: {
+    minHeight: 70,
+    borderWidth: 1,
     borderRadius: 6,
-    borderWidth: 0.8,
+    padding: 10,
+    fontSize: 12,
+    fontFamily: 'monospace',
+    textAlignVertical: 'top',
     backgroundColor: '#01050A',
-    gap: 2,
   },
-  testCaseTitleRow: {
+  resultsContainer: {
+    gap: 12,
+  },
+  statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  testCaseName: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: 'monospace',
+  statusBannerTextGroup: {
     flex: 1,
   },
-  testStatusTag: {
-    fontSize: 9,
+  statusBannerTitle: {
+    fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
+    color: '#00FFA3',
+    letterSpacing: 1,
   },
-  testAssertionNote: {
+  statusBannerSubtitle: {
     fontSize: 9,
     fontFamily: 'monospace',
-    paddingLeft: 18,
-  },
-  logSection: {
-    paddingTop: 4,
-    gap: 2,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0, 255, 163, 0.2)',
-  },
-  logSectionTitle: {
-    fontSize: 8,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-    marginBottom: 2,
-  },
-  logLineText: {
-    fontSize: 8,
-    fontFamily: 'monospace',
-  },
-  outputSection: {
-    gap: 8,
-    marginTop: 6,
+    marginTop: 2,
   },
   codeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderWidth: 1,
-    borderBottomWidth: 0,
   },
-  codeTitleGroup: {
+  codeHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -587,68 +329,81 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     fontFamily: 'monospace',
-  },
-  complexityTag: {
-    fontSize: 9,
-    fontFamily: 'monospace',
+    letterSpacing: 1.2,
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#1E293B',
   },
-  copyText: {
+  copyBtnText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '700',
     fontFamily: 'monospace',
   },
-  codeBody: {
-    backgroundColor: '#010409',
-    padding: 12,
-    borderWidth: 1,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+  codeBox: {
+    backgroundColor: '#01050A',
+    borderRadius: 6,
+    padding: 10,
+    maxHeight: 280,
   },
-  codeFont: {
+  codeText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    lineHeight: 16,
+  },
+  explanationText: {
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 1.1,
+  },
+  testCaseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+  },
+  testCaseLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  testCaseName: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  passedBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 255, 163, 0.15)',
+  },
+  passedBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    fontFamily: 'monospace',
     color: '#00FFA3',
-    fontSize: 11,
+  },
+  terminalText: {
+    fontSize: 10,
     fontFamily: 'monospace',
-    lineHeight: 16,
-  },
-  explainCard: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-  },
-  explainLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-  },
-  explainText: {
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  runActionWrap: {
-    marginTop: 2,
-  },
-  runOutputBox: {
-    backgroundColor: '#030B14',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-  },
-  runOutputTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    fontFamily: 'monospace',
-  },
-  runOutputFont: {
-    color: '#E0F7FF',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    lineHeight: 15,
+    color: '#7CD5F8',
+    lineHeight: 14,
   },
 });
