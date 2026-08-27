@@ -11,7 +11,7 @@ import {
 import { PersonaMode, AppSettings } from '../types';
 import { getThemeForMode } from '../theme/sciFiThemes';
 import { IronManHudOverlay } from '../components/IronManHudOverlay';
-import { HolographicButton } from '../components/HolographicButton';
+import { MotionService, MotionOrientation } from '../services/motionService';
 import { soundFx } from '../audio/soundEngine';
 import {
   Box,
@@ -19,11 +19,10 @@ import {
   RotateCw,
   ZoomIn,
   ZoomOut,
-  Maximize2,
-  Shield,
+  Smartphone,
+  Cpu,
   Zap,
   Activity,
-  Cpu,
 } from 'lucide-react-native';
 
 interface ThreeDVisualizerProps {
@@ -36,15 +35,16 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
   const [modelType, setModelType] = useState<'REACTOR' | 'HELMET' | 'REPULSOR'>('REACTOR');
   const [explodedView, setExplodedView] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [gyroEnabled, setGyroEnabled] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [selectedSubsystem, setSelectedSubsystem] = useState<string | null>(null);
+  const [motion, setMotion] = useState<MotionOrientation>(MotionService.getOrientation());
 
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const pitchAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let animLoop: Animated.CompositeAnimation | null = null;
-    if (autoRotate) {
+    if (autoRotate && !gyroEnabled) {
       animLoop = Animated.loop(
         Animated.timing(rotateAnim, {
           toValue: 1,
@@ -58,12 +58,22 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
       rotateAnim.stopAnimation();
     }
     return () => animLoop?.stop();
-  }, [autoRotate]);
+  }, [autoRotate, gyroEnabled]);
+
+  useEffect(() => {
+    const unsub = MotionService.subscribe((o) => {
+      setMotion(o);
+    });
+    return () => unsub();
+  }, []);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  const gyroTiltX = gyroEnabled ? `${motion.gamma * 0.8}deg` : '0deg';
+  const gyroTiltY = gyroEnabled ? `${motion.beta * 0.8}deg` : '0deg';
 
   const subsystems = [
     { name: 'Magnetic Confinement Rings', status: '100% NOMINAL', load: '3.5 GJ/s' },
@@ -84,7 +94,7 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
             </Text>
           </View>
           <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-            Interactive 360° Wireframe Core & Component Inspection
+            Interactive 360° Wireframe Core & Real-Time Gyroscope Motion Controls
           </Text>
         </View>
 
@@ -127,15 +137,29 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
             },
           ]}
         >
-          {/* Animated Rotating 3D Wireframe Rings */}
-          <View style={[styles.canvasCenter, { transform: [{ scale: zoomLevel }] }]}>
+          {/* Animated Rotating 3D Wireframe Rings with Gyroscope Transform */}
+          <Animated.View
+            style={[
+              styles.canvasCenter,
+              {
+                transform: [
+                  { scale: zoomLevel },
+                  { rotateX: gyroTiltY },
+                  { rotateY: gyroTiltX },
+                ],
+              },
+            ]}
+          >
             {/* Outer Hex Ring */}
             <Animated.View
               style={[
                 styles.wireframeOuterRing,
                 {
                   borderColor: theme.colors.primaryGlow,
-                  transform: [{ rotate: spin }, { scale: explodedView ? 1.3 : 1 }],
+                  transform: [
+                    { rotate: gyroEnabled ? `${motion.alpha}deg` : spin },
+                    { scale: explodedView ? 1.3 : 1 },
+                  ],
                 },
               ]}
             >
@@ -160,7 +184,10 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
                 {
                   borderColor: theme.colors.secondary,
                   borderStyle: 'dashed',
-                  transform: [{ rotate: spin }, { scale: explodedView ? 1.15 : 1 }],
+                  transform: [
+                    { rotate: gyroEnabled ? `${-motion.alpha}deg` : spin },
+                    { scale: explodedView ? 1.15 : 1 },
+                  ],
                 },
               ]}
             />
@@ -177,15 +204,30 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
                 },
               ]}
             />
-          </View>
+          </Animated.View>
 
           {/* Viewport Floating Controls */}
           <View style={styles.floatingControls}>
             <TouchableOpacity
+              onPress={() => {
+                soundFx.playHudClick();
+                setGyroEnabled(!gyroEnabled);
+              }}
+              style={[
+                styles.floatingBtn,
+                {
+                  borderColor: gyroEnabled ? theme.colors.accent : theme.colors.border,
+                  backgroundColor: gyroEnabled ? 'rgba(56, 239, 125, 0.25)' : '#050D1AE6',
+                },
+              ]}
+            >
+              <Smartphone size={14} color={gyroEnabled ? theme.colors.accent : '#5A6F87'} />
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => setAutoRotate(!autoRotate)}
               style={[styles.floatingBtn, { borderColor: theme.colors.border }]}
             >
-              <RotateCw size={14} color={autoRotate ? theme.colors.primary : '#5A6F87'} />
+              <RotateCw size={14} color={autoRotate && !gyroEnabled ? theme.colors.primary : '#5A6F87'} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setExplodedView(!explodedView)}
@@ -210,7 +252,9 @@ export const ThreeDVisualizerScreen: React.FC<ThreeDVisualizerProps> = ({ mode }
           {/* Viewport HUD Footer */}
           <View style={[styles.viewportFooter, { borderTopColor: theme.colors.border }]}>
             <Text style={[styles.viewportHudText, { color: theme.colors.textSecondary }]}>
-              MODEL: {modelType} // EXPLODED: {explodedView ? 'YES' : 'NO'} // ROTATION: {autoRotate ? 'ACTIVE' : 'LOCKED'}
+              {gyroEnabled
+                ? `GYRO SENSOR: ACTIVE // PITCH(β): ${motion.beta}° // ROLL(γ): ${motion.gamma}° // YAW(α): ${motion.alpha}°`
+                : `MODEL: ${modelType} // EXPLODED: ${explodedView ? 'YES' : 'NO'} // ROTATION: ${autoRotate ? 'AUTO' : 'LOCKED'}`}
             </Text>
           </View>
         </View>
