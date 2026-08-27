@@ -16,9 +16,6 @@ import { LiveSubtitleScreen } from './src/screens/LiveSubtitleScreen';
 import { NetworkScannerScreen } from './src/screens/NetworkScannerScreen';
 import { DocumentVaultScreen } from './src/screens/DocumentVaultScreen';
 import { VoiceVaultScreen } from './src/screens/VoiceVaultScreen';
-import { TacticalGamesScreen } from './src/screens/TacticalGamesScreen';
-import { ProactiveBriefingScreen } from './src/screens/ProactiveBriefingScreen';
-import { VisionScannerScreen } from './src/screens/VisionScannerScreen';
 import { DebateArenaScreen } from './src/screens/DebateArenaScreen';
 import { DeviceControlScreen } from './src/screens/DeviceControlScreen';
 import { TerminalScreen } from './src/screens/TerminalScreen';
@@ -32,9 +29,6 @@ import {
   Radio,
   FolderLock,
   Volume2,
-  Gamepad2,
-  Sun,
-  Scan,
   Swords,
   Cpu,
   Terminal as TermIcon,
@@ -49,9 +43,6 @@ type TabKey =
   | 'network'
   | 'vault'
   | 'voice'
-  | 'games'
-  | 'briefing'
-  | 'scanner'
   | 'debate'
   | 'device'
   | 'terminal'
@@ -86,9 +77,6 @@ export default function App() {
     { key: 'network', label: 'NET SCAN', icon: Radio },
     { key: 'vault', label: 'DOCS', icon: FolderLock },
     { key: 'voice', label: 'VOICE', icon: Volume2 },
-    { key: 'games', label: 'GAMES', icon: Gamepad2 },
-    { key: 'briefing', label: 'BRIEFING', icon: Sun },
-    { key: 'scanner', label: 'VISION', icon: Scan },
     { key: 'debate', label: 'DUEL', icon: Swords },
     { key: 'device', label: 'SYSTEM', icon: Cpu },
     { key: 'terminal', label: 'CLI', icon: TermIcon },
@@ -127,15 +115,6 @@ export default function App() {
           )}
           {activeTab === 'voice' && (
             <VoiceVaultScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === 'games' && (
-            <TacticalGamesScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === 'briefing' && (
-            <ProactiveBriefingScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === 'scanner' && (
-            <VisionScannerScreen mode={mode} settings={settings} />
           )}
           {activeTab === 'debate' && (
             <DebateArenaScreen mode={mode} settings={settings} />
