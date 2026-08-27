@@ -12,8 +12,6 @@ import { speechEngine } from './src/audio/speechEngine';
 import { MainHudScreen } from './src/screens/MainHudScreen';
 import { CodeStudioScreen } from './src/screens/CodeStudioScreen';
 import { AgentWorkflowScreen } from './src/screens/AgentWorkflowScreen';
-import { ThreeDVisualizerScreen } from './src/screens/ThreeDVisualizerScreen';
-import { MobileHardwareHubScreen } from './src/screens/MobileHardwareHubScreen';
 import { LiveSubtitleScreen } from './src/screens/LiveSubtitleScreen';
 import { NetworkScannerScreen } from './src/screens/NetworkScannerScreen';
 import { DocumentVaultScreen } from './src/screens/DocumentVaultScreen';
@@ -30,8 +28,6 @@ import {
   Compass,
   Code,
   Workflow,
-  Box,
-  Smartphone,
   Captions,
   Radio,
   FolderLock,
@@ -49,8 +45,6 @@ type TabKey =
   | 'hud'
   | 'code'
   | 'missions'
-  | '3d'
-  | 'lab'
   | 'subtitles'
   | 'network'
   | 'vault'
@@ -88,8 +82,6 @@ export default function App() {
     { key: 'hud', label: 'HUD', icon: Compass },
     { key: 'code', label: 'CODE', icon: Code },
     { key: 'missions', label: 'AGENT', icon: Workflow },
-    { key: '3d', label: '3D CORE', icon: Box },
-    { key: 'lab', label: 'SENSOR LAB', icon: Smartphone },
     { key: 'subtitles', label: 'CAPTIONS', icon: Captions },
     { key: 'network', label: 'NET SCAN', icon: Radio },
     { key: 'vault', label: 'DOCS', icon: FolderLock },
@@ -123,12 +115,6 @@ export default function App() {
           )}
           {activeTab === 'missions' && (
             <AgentWorkflowScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === '3d' && (
-            <ThreeDVisualizerScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === 'lab' && (
-            <MobileHardwareHubScreen mode={mode} settings={settings} />
           )}
           {activeTab === 'subtitles' && (
             <LiveSubtitleScreen mode={mode} settings={settings} />
