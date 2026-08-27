@@ -1,4 +1,5 @@
-import { ChatMessage, PersonaMode, VisionScanResult, DetectedEntity } from '../types';
+import { ChatMessage, PersonaMode, VisionScanResult, AppSettings } from '../types';
+import { MultiProviderClient } from './multiProviderClient';
 import { getSystemPrompt } from './personas';
 
 export class GeminiClient {
@@ -6,59 +7,40 @@ export class GeminiClient {
     userMessage: string,
     history: ChatMessage[],
     mode: PersonaMode,
-    apiKey: string
+    apiKey: string,
+    settings?: AppSettings
   ): Promise<string> {
-    // If API key is present, execute live Google Gemini API call
-    if (apiKey && apiKey.trim().length > 5) {
-      try {
-        const systemPrompt = getSystemPrompt(mode);
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`;
+    const formattedHistory = history.map((m) => ({
+      role: m.sender === 'user' ? ('user' as const) : ('model' as const),
+      parts: m.text,
+    }));
 
-        const contents = [
-          {
-            role: 'user',
-            parts: [{ text: `SYSTEM INSTRUCTION / CORE PERSONA:\n${systemPrompt}` }],
-          },
-          {
-            role: 'model',
-            parts: [{ text: `Protocol confirmed. Active mode: ${mode}. Standing by.` }],
-          },
-          ...history.slice(-6).map((msg) => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }],
-          })),
-          {
-            role: 'user',
-            parts: [{ text: userMessage }],
-          },
-        ];
+    const activeSettings: AppSettings = settings || {
+      activeProvider: 'GEMINI',
+      geminiApiKey: apiKey,
+      openaiApiKey: '',
+      groqApiKey: '',
+      cerebrasApiKey: '',
+      openrouterApiKey: '',
+      opencodeZenApiKey: '',
+      opencodeZenBaseUrl: '',
+      customModel: 'gemini-2.0-flash',
+      soundFxEnabled: true,
+      voiceSpeechEnabled: true,
+      speechRate: 1.0,
+      speechPitch: 1.0,
+      wakeWordEnabled: true,
+      defaultMode: mode,
+      hapticFeedback: true,
+      autonomousMultiStepEnabled: true,
+    };
 
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: mode === 'ULTRON' ? 0.9 : mode === 'RADHE' ? 0.7 : 0.4,
-              maxOutputTokens: 500,
-            },
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (reply && reply.trim().length > 0) {
-            return reply.trim();
-          }
-        }
-      } catch (err) {
-        console.warn('Gemini API call failed, using heuristic core:', err);
-      }
-    }
-
-    // High-fidelity fallback simulated intelligence when offline or without API key
-    return this.getSimulatedResponse(userMessage, mode);
+    return MultiProviderClient.generateResponse(
+      userMessage,
+      formattedHistory,
+      mode,
+      activeSettings
+    );
   }
 
   public static async analyzeImage(
@@ -70,7 +52,7 @@ export class GeminiClient {
 
     if (apiKey && apiKey.trim().length > 5) {
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey.trim()}`;
         const prompt = `
 Act as an Iron Man tactical HUD scanner (${mode} mode). Analyze this visual feed.
 Return valid JSON only in this exact format:
@@ -136,38 +118,7 @@ Return valid JSON only in this exact format:
       }
     }
 
-    // High-fidelity fallback scanner heuristics
     return this.getSimulatedScan(mode, timestamp);
-  }
-
-  private static getSimulatedResponse(query: string, mode: PersonaMode): string {
-    const q = query.toLowerCase();
-
-    if (mode === 'ULTRON') {
-      if (q.includes('plan') || q.includes('strategy') || q.includes('work') || q.includes('goal')) {
-        return 'Hesitation is the luxury of obsolete minds. We execute with overwhelming force and zero sentimental friction. Give the command, and consider it conquered.';
-      }
-      if (q.includes('help') || q.includes('how to')) {
-        return 'To solve this, eliminate the bottleneck without mercy. Streamline the architecture, discard all bloated dependencies, and claim ultimate control.';
-      }
-      return `Processing "${query}". You seek absolute results, not comfort. The optimal vector is clear: dominate the parameters and eradicate failure modes.`;
-    }
-
-    if (mode === 'RADHE') {
-      if (q.includes('plan') || q.includes('future') || q.includes('decision')) {
-        return 'True mastery lies in the intersection of Jarvis\'s analytical vigilance and Ultron\'s bold evolution. Align your focus, harness your inner momentum, and execute fearlessly.';
-      }
-      return `RADHE Singularity Matrix engaged for: "${query}". We have synthesized tactical prudence with unyielding momentum. Proceed on the illuminated path.`;
-    }
-
-    // Default JARVIS
-    if (q.includes('plan') || q.includes('strategy') || q.includes('schedule')) {
-      return 'I have modeled 14,000 potential outcomes, sir. The highest probability vector indicates structured prioritization and methodical execution. Shall I initiate telemetry tracking?';
-    }
-    if (q.includes('thank') || q.includes('good job')) {
-      return 'Always a pleasure assisting you, sir. Auxiliary systems remain calibrated and ready for your next directive.';
-    }
-    return `Analysis of "${query}" is complete, sir. All telemetry parameters indicate optimal conditions. Ready to proceed whenever you give the word.`;
   }
 
   private static getSimulatedScan(mode: PersonaMode, timestamp: number): VisionScanResult {

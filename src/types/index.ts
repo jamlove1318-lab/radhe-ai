@@ -2,6 +2,14 @@ export type PersonaMode = 'JARVIS' | 'ULTRON' | 'RADHE';
 
 export type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
+export type LLMProvider =
+  | 'GEMINI'
+  | 'OPENAI'
+  | 'GROQ'
+  | 'CEREBRAS'
+  | 'OPENROUTER'
+  | 'OPENCODE_ZEN';
+
 export interface ToolParameter {
   type: 'string' | 'number' | 'boolean' | 'object';
   description: string;
@@ -139,7 +147,14 @@ export interface WorkflowMission {
 }
 
 export interface AppSettings {
+  activeProvider: LLMProvider;
   geminiApiKey: string;
+  openaiApiKey: string;
+  groqApiKey: string;
+  cerebrasApiKey: string;
+  openrouterApiKey: string;
+  opencodeZenApiKey: string;
+  opencodeZenBaseUrl: string;
   customModel: string;
   soundFxEnabled: boolean;
   voiceSpeechEnabled: boolean;

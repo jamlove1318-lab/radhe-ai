@@ -8,8 +8,15 @@ const DEBATES_KEY = '@radhe_debates_v1';
 const SCANS_KEY = '@radhe_scans_v1';
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  activeProvider: 'GEMINI',
   geminiApiKey: '',
-  customModel: 'gemini-2.5-flash',
+  openaiApiKey: '',
+  groqApiKey: '',
+  cerebrasApiKey: '',
+  openrouterApiKey: '',
+  opencodeZenApiKey: '',
+  opencodeZenBaseUrl: 'https://api.opencode.zen/v1',
+  customModel: 'gemini-2.0-flash',
   soundFxEnabled: true,
   voiceSpeechEnabled: true,
   speechRate: 1.0,
@@ -51,7 +58,6 @@ class StorageService {
 
   public async saveChatHistory(messages: ChatMessage[]): Promise<void> {
     try {
-      // Keep last 100 messages
       const trimmed = messages.slice(-100);
       await AsyncStorage.setItem(CHAT_KEY, JSON.stringify(trimmed));
     } catch (e) {}

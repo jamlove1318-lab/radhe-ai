@@ -179,12 +179,13 @@ export const MainHudScreen: React.FC<MainHudProps> = ({
       actionExecuted = agentResult.actionExecuted;
       soundFx.playTargetLock();
     } else {
-      // 3. Cloud LLM / Persona Reasoning
+      // 3. Multi-Provider Cloud LLM / Persona Reasoning
       replyText = await GeminiClient.generateResponse(
         query,
         newHistory,
         mode,
-        settings.geminiApiKey
+        settings.geminiApiKey,
+        settings
       );
     }
 

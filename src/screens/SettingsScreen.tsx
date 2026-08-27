@@ -7,26 +7,26 @@ import {
   TextInput,
   TouchableOpacity,
   Switch,
-  Alert,
 } from 'react-native';
-import { PersonaMode, AppSettings } from '../types';
+import { PersonaMode, AppSettings, LLMProvider } from '../types';
 import { getThemeForMode } from '../theme/sciFiThemes';
 import { IronManHudOverlay } from '../components/IronManHudOverlay';
 import { HolographicButton } from '../components/HolographicButton';
 import { storageService } from '../services/storageService';
+import { MultiProviderClient, SUPPORTED_MODELS } from '../ai/multiProviderClient';
 import { soundFx } from '../audio/soundEngine';
 import { speechEngine } from '../audio/speechEngine';
 import {
   Key,
   Volume2,
-  Mic,
   Cpu,
   Trash2,
   Save,
   CheckCircle,
-  Sliders,
-  Shield,
+  Globe,
   Sparkles,
+  Server,
+  Zap,
 } from 'lucide-react-native';
 
 interface SettingsProps {
@@ -41,17 +41,47 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
   onUpdateSettings,
 }) => {
   const theme = getThemeForMode(mode);
-  const [apiKey, setApiKey] = useState(settings.geminiApiKey);
+  const [activeProvider, setActiveProvider] = useState<LLMProvider>(settings.activeProvider || 'GEMINI');
+  
+  // API Keys state for all 6 providers
+  const [geminiKey, setGeminiKey] = useState(settings.geminiApiKey);
+  const [openaiKey, setOpenaiKey] = useState(settings.openaiApiKey || '');
+  const [groqKey, setGroqKey] = useState(settings.groqApiKey || '');
+  const [cerebrasKey, setCerebrasKey] = useState(settings.cerebrasApiKey || '');
+  const [openrouterKey, setOpenrouterKey] = useState(settings.openrouterApiKey || '');
+  const [opencodeZenKey, setOpencodeZenKey] = useState(settings.opencodeZenApiKey || '');
+  const [opencodeZenBaseUrl, setOpencodeZenBaseUrl] = useState(settings.opencodeZenBaseUrl || 'https://api.opencode.zen/v1');
+  const [customModel, setCustomModel] = useState(settings.customModel);
+
   const [soundEnabled, setSoundEnabled] = useState(settings.soundFxEnabled);
   const [speechEnabled, setSpeechEnabled] = useState(settings.voiceSpeechEnabled);
   const [wakeWord, setWakeWord] = useState(settings.wakeWordEnabled);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+
+  const providers: Array<{ id: LLMProvider; name: string; tag: string }> = [
+    { id: 'GEMINI', name: 'Google Gemini', tag: '2.0 Flash / Pro' },
+    { id: 'OPENAI', name: 'OpenAI', tag: 'GPT-4o / o1-mini' },
+    { id: 'GROQ', name: 'Groq Cloud', tag: '500+ tok/s LPU' },
+    { id: 'CEREBRAS', name: 'Cerebras', tag: 'Wafer-Scale AI' },
+    { id: 'OPENROUTER', name: 'OpenRouter', tag: 'Claude / DeepSeek' },
+    { id: 'OPENCODE_ZEN', name: 'Opencode Zen', tag: 'Custom Endpoint' },
+  ];
 
   const handleSave = async () => {
     soundFx.playHudClick();
     const updated: AppSettings = {
       ...settings,
-      geminiApiKey: apiKey.trim(),
+      activeProvider,
+      geminiApiKey: geminiKey.trim(),
+      openaiApiKey: openaiKey.trim(),
+      groqApiKey: groqKey.trim(),
+      cerebrasApiKey: cerebrasKey.trim(),
+      openrouterApiKey: openrouterKey.trim(),
+      opencodeZenApiKey: opencodeZenKey.trim(),
+      opencodeZenBaseUrl: opencodeZenBaseUrl.trim(),
+      customModel: customModel.trim(),
       soundFxEnabled: soundEnabled,
       voiceSpeechEnabled: speechEnabled,
       wakeWordEnabled: wakeWord,
@@ -64,6 +94,40 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
 
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleTestConnection = async () => {
+    soundFx.playAlert();
+    setIsTesting(true);
+    setTestResult(null);
+
+    const tempSettings: AppSettings = {
+      ...settings,
+      activeProvider,
+      geminiApiKey: geminiKey.trim(),
+      openaiApiKey: openaiKey.trim(),
+      groqApiKey: groqKey.trim(),
+      cerebrasApiKey: cerebrasKey.trim(),
+      openrouterApiKey: openrouterKey.trim(),
+      opencodeZenApiKey: opencodeZenKey.trim(),
+      opencodeZenBaseUrl: opencodeZenBaseUrl.trim(),
+      customModel: customModel.trim(),
+    };
+
+    try {
+      const response = await MultiProviderClient.generateResponse(
+        'Ping test: Respond in exactly 8 words confirming link.',
+        [],
+        mode,
+        tempSettings
+      );
+      setTestResult(`[${activeProvider} CONNECTED] ${response.substring(0, 100)}`);
+      soundFx.playTargetLock();
+    } catch (e: any) {
+      setTestResult(`[${activeProvider} ERROR] ${e.message}`);
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleTestVoice = () => {
@@ -87,26 +151,209 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
   return (
     <IronManHudOverlay mode={mode}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Gemini API Key Section */}
-        <View style={[styles.card, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+        {/* Header */}
+        <View style={[styles.headerCard, { backgroundColor: theme.colors.surfaceElevated, borderColor: theme.colors.border }]}>
+          <View style={styles.headerIconRow}>
+            <Globe size={20} color={theme.colors.primary} />
+            <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
+              MULTI-PROVIDER AI NEURAL MATRIX
+            </Text>
+          </View>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
+            Connect Gemini, OpenAI, Groq, Cerebras, OpenRouter & Opencode Zen
+          </Text>
+        </View>
+
+        {/* Provider Switcher Tabs */}
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
+          SELECT ACTIVE AI ENGINE PROVIDER:
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerScroll}>
+          {providers.map((p) => {
+            const isSel = activeProvider === p.id;
+            return (
+              <TouchableOpacity
+                key={p.id}
+                onPress={() => {
+                  soundFx.playHudClick();
+                  setActiveProvider(p.id);
+                  const firstModel = SUPPORTED_MODELS[p.id]?.[0]?.id;
+                  if (firstModel) setCustomModel(firstModel);
+                }}
+                style={[
+                  styles.providerChip,
+                  {
+                    borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: isSel ? 'rgba(0, 240, 255, 0.15)' : theme.colors.surface,
+                  },
+                ]}
+              >
+                <Server size={12} color={isSel ? theme.colors.primary : '#5A6F87'} />
+                <View>
+                  <Text style={[styles.providerChipText, { color: isSel ? theme.colors.primary : theme.colors.textPrimary }]}>
+                    {p.name}
+                  </Text>
+                  <Text style={[styles.providerTag, { color: isSel ? theme.colors.accent : theme.colors.textMuted }]}>
+                    {p.tag}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Active Provider Configuration Card */}
+        <View style={[styles.card, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
           <View style={styles.cardHeader}>
             <Key size={16} color={theme.colors.primary} />
             <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>
-              GOOGLE GEMINI CLOUD API KEY
+              {activeProvider} API CREDENTIALS & MODEL
             </Text>
           </View>
-          <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
-            Enables full Gemini 2.0 Flash reasoning, real-time multi-modal vision analysis, and infinite intelligence. (Offline mode operates automatically if empty).
+
+          {/* Provider Specific Input */}
+          {activeProvider === 'GEMINI' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                Google Gemini API Key (Gemini 2.0 Flash / Pro)
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="AIzaSy..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={geminiKey}
+                onChangeText={setGeminiKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {activeProvider === 'OPENAI' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                OpenAI API Key (GPT-4o, GPT-4o Mini, o1)
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="sk-proj-..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={openaiKey}
+                onChangeText={setOpenaiKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {activeProvider === 'GROQ' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                Groq Cloud API Key (LPU Ultra-Fast Inference)
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="gsk_..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={groqKey}
+                onChangeText={setGroqKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {activeProvider === 'CEREBRAS' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                Cerebras API Key (Wafer-Scale Engine)
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="csk-..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={cerebrasKey}
+                onChangeText={setCerebrasKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {activeProvider === 'OPENROUTER' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                OpenRouter API Key (Claude 3.5, DeepSeek R1, Llama 3.3)
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="sk-or-v1-..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={openrouterKey}
+                onChangeText={setOpenrouterKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {activeProvider === 'OPENCODE_ZEN' && (
+            <>
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary }]}>
+                Opencode Zen / Custom OpenAI-Compatible Base URL:
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="https://api.opencode.zen/v1"
+                placeholderTextColor={theme.colors.textMuted}
+                value={opencodeZenBaseUrl}
+                onChangeText={setOpencodeZenBaseUrl}
+                autoCapitalize="none"
+              />
+              <Text style={[styles.cardDesc, { color: theme.colors.textSecondary, marginTop: 4 }]}>
+                Opencode Zen API Key:
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+                placeholder="zen_api_key..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={opencodeZenKey}
+                onChangeText={setOpencodeZenKey}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </>
+          )}
+
+          {/* Model Name Selector */}
+          <Text style={[styles.cardDesc, { color: theme.colors.textSecondary, marginTop: 6 }]}>
+            TARGET MODEL IDENTIFIER:
           </Text>
           <TextInput
-            style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceElevated }]}
-            placeholder="AIzaSy..."
+            style={[styles.apiKeyInput, { color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+            placeholder="e.g. gemini-2.0-flash, gpt-4o, llama-3.3-70b-versatile..."
             placeholderTextColor={theme.colors.textMuted}
-            value={apiKey}
-            onChangeText={setApiKey}
-            secureTextEntry
+            value={customModel}
+            onChangeText={setCustomModel}
             autoCapitalize="none"
           />
+
+          {/* Test Link Button */}
+          <HolographicButton
+            title={isTesting ? 'Pinging Provider API...' : `Test ${activeProvider} Link`}
+            mode={mode}
+            variant="secondary"
+            icon={<Zap size={14} color="#FFF" />}
+            onPress={handleTestConnection}
+          />
+
+          {testResult && (
+            <View style={[styles.testResultBox, { borderColor: theme.colors.border }]}>
+              <Text style={[styles.testResultText, { color: testResult.includes('ERROR') ? theme.colors.danger : theme.colors.success }]}>
+                {testResult}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Audio & Voice Configuration */}
@@ -204,7 +451,7 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
         {/* Save Settings Button */}
         <View style={styles.saveWrap}>
           <HolographicButton
-            title={savedSuccess ? 'Settings Synchronized!' : 'Save Configuration'}
+            title={savedSuccess ? 'All Settings Synchronized!' : 'Save Multi-Provider Configuration'}
             mode={mode}
             icon={savedSuccess ? <CheckCircle size={16} color="#00FFA3" /> : <Save size={16} color="#FFF" />}
             onPress={handleSave}
@@ -224,6 +471,56 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
     paddingBottom: 28,
+  },
+  headerCard: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+    letterSpacing: 1.2,
+  },
+  headerSubtitle: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 1.2,
+  },
+  providerScroll: {
+    gap: 8,
+  },
+  providerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  providerChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  providerTag: {
+    fontSize: 8,
+    fontFamily: 'monospace',
   },
   card: {
     padding: 12,
@@ -251,8 +548,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 10,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'monospace',
+    backgroundColor: '#01050A',
+  },
+  testResultBox: {
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    backgroundColor: '#01050A',
+  },
+  testResultText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    lineHeight: 14,
   },
   settingRow: {
     flexDirection: 'row',
