@@ -11,7 +11,6 @@ import { speechEngine } from './src/audio/speechEngine';
 
 import { MainHudScreen } from './src/screens/MainHudScreen';
 import { CodeStudioScreen } from './src/screens/CodeStudioScreen';
-import { AgentWorkflowScreen } from './src/screens/AgentWorkflowScreen';
 import { LiveSubtitleScreen } from './src/screens/LiveSubtitleScreen';
 import { NetworkScannerScreen } from './src/screens/NetworkScannerScreen';
 import { DocumentVaultScreen } from './src/screens/DocumentVaultScreen';
@@ -24,7 +23,6 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import {
   Compass,
   Code,
-  Workflow,
   Captions,
   Radio,
   FolderLock,
@@ -38,7 +36,6 @@ import {
 type TabKey =
   | 'hud'
   | 'code'
-  | 'missions'
   | 'subtitles'
   | 'network'
   | 'vault'
@@ -72,7 +69,6 @@ export default function App() {
   const tabs: Array<{ key: TabKey; label: string; icon: any }> = [
     { key: 'hud', label: 'HUD', icon: Compass },
     { key: 'code', label: 'CODE', icon: Code },
-    { key: 'missions', label: 'AGENT', icon: Workflow },
     { key: 'subtitles', label: 'CAPTIONS', icon: Captions },
     { key: 'network', label: 'NET SCAN', icon: Radio },
     { key: 'vault', label: 'DOCS', icon: FolderLock },
@@ -100,9 +96,6 @@ export default function App() {
           )}
           {activeTab === 'code' && (
             <CodeStudioScreen mode={mode} settings={settings} />
-          )}
-          {activeTab === 'missions' && (
-            <AgentWorkflowScreen mode={mode} settings={settings} />
           )}
           {activeTab === 'subtitles' && (
             <LiveSubtitleScreen mode={mode} settings={settings} />
