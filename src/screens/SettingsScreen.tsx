@@ -56,6 +56,8 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(settings.soundFxEnabled);
   const [speechEnabled, setSpeechEnabled] = useState(settings.voiceSpeechEnabled);
   const [wakeWord, setWakeWord] = useState(settings.wakeWordEnabled);
+  const [autoFailover, setAutoFailover] = useState(settings.autoFailoverEnabled !== false);
+  const [preferFree, setPreferFree] = useState(settings.preferFreeTier !== false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -85,6 +87,8 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
       soundFxEnabled: soundEnabled,
       voiceSpeechEnabled: speechEnabled,
       wakeWordEnabled: wakeWord,
+      autoFailoverEnabled: autoFailover,
+      preferFreeTier: preferFree,
     };
 
     soundFx.setEnabled(soundEnabled);
@@ -354,6 +358,52 @@ export const SettingsScreen: React.FC<SettingsProps> = ({
               </Text>
             </View>
           )}
+        </View>
+
+        {/* Autonomous Failover & Free Tier Optimizer */}
+        <View style={[styles.card, { borderColor: theme.colors.accent, backgroundColor: theme.colors.surface }]}>
+          <View style={styles.cardHeader}>
+            <Sparkles size={16} color={theme.colors.accent} />
+            <Text style={[styles.cardTitle, { color: theme.colors.accent }]}>
+              AUTONOMOUS FAILOVER & FREE-TIER OPTIMIZER
+            </Text>
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingLabelGroup}>
+              <Text style={[styles.settingLabel, { color: theme.colors.textPrimary }]}>
+                Autonomous Error & Rate-Limit Failover
+              </Text>
+              <Text style={[styles.settingSub, { color: theme.colors.textMuted }]}>
+                Auto-switches to next provider on quota/error (Only 1 model active at a time)
+              </Text>
+            </View>
+            <Switch
+              value={autoFailover}
+              onValueChange={setAutoFailover}
+              trackColor={{ false: '#1E293B', true: theme.colors.accent }}
+              thumbColor="#FFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingLabelGroup}>
+              <Text style={[styles.settingLabel, { color: theme.colors.textPrimary }]}>
+                Prioritize Free-Tier AI Models
+              </Text>
+              <Text style={[styles.settingSub, { color: theme.colors.textMuted }]}>
+                Auto-selects 100% free models on Gemini, Groq, Cerebras & OpenRouter
+              </Text>
+            </View>
+            <Switch
+              value={preferFree}
+              onValueChange={setPreferFree}
+              trackColor={{ false: '#1E293B', true: theme.colors.accent }}
+              thumbColor="#FFF"
+            />
+          </View>
         </View>
 
         {/* Audio & Voice Configuration */}

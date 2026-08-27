@@ -6,33 +6,37 @@ export interface ProviderModelOption {
   name: string;
   provider: LLMProvider;
   contextWindow: string;
+  isFreeTier: boolean;
 }
 
 export const SUPPORTED_MODELS: Record<LLMProvider, ProviderModelOption[]> = {
   GEMINI: [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Fastest / Recommended)', provider: 'GEMINI', contextWindow: '1M' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep Reasoning)', provider: 'GEMINI', contextWindow: '2M' },
-  ],
-  OPENAI: [
-    { id: 'gpt-4o', name: 'GPT-4o (Omni Multimodal)', provider: 'OPENAI', contextWindow: '128K' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Ultra Fast)', provider: 'OPENAI', contextWindow: '128K' },
-    { id: 'o1-mini', name: 'o1-mini (STEM Reasoning)', provider: 'OPENAI', contextWindow: '128K' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Free Tier / Ultra Fast)', provider: 'GEMINI', contextWindow: '1M', isFreeTier: true },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Free Tier)', provider: 'GEMINI', contextWindow: '1M', isFreeTier: true },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep Reasoning)', provider: 'GEMINI', contextWindow: '2M', isFreeTier: false },
   ],
   GROQ: [
-    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq LPU ~500 tok/s)', provider: 'GROQ', contextWindow: '128K' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq LPU)', provider: 'GROQ', contextWindow: '32K' },
+    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq Free Tier ~500 tok/s)', provider: 'GROQ', contextWindow: '128K', isFreeTier: true },
+    { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant (Groq Free Tier)', provider: 'GROQ', contextWindow: '128K', isFreeTier: true },
+    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq Free Tier)', provider: 'GROQ', contextWindow: '32K', isFreeTier: true },
   ],
   CEREBRAS: [
-    { id: 'llama-3.3-70b', name: 'Llama 3.3 70B (Cerebras Wafer-Scale)', provider: 'CEREBRAS', contextWindow: '8K' },
-    { id: 'llama-3.1-8b', name: 'Llama 3.1 8B (Ultra Low Latency)', provider: 'CEREBRAS', contextWindow: '8K' },
+    { id: 'llama-3.3-70b', name: 'Llama 3.3 70B (Cerebras Free Tier Wafer-Scale)', provider: 'CEREBRAS', contextWindow: '8K', isFreeTier: true },
+    { id: 'llama-3.1-8b', name: 'Llama 3.1 8B (Cerebras Free Tier)', provider: 'CEREBRAS', contextWindow: '8K', isFreeTier: true },
   ],
   OPENROUTER: [
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet (OpenRouter)', provider: 'OPENROUTER', contextWindow: '200K' },
-    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1 (OpenRouter)', provider: 'OPENROUTER', contextWindow: '64K' },
-    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B (OpenRouter)', provider: 'OPENROUTER', contextWindow: '128K' },
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (OpenRouter 100% Free)', provider: 'OPENROUTER', contextWindow: '128K', isFreeTier: true },
+    { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (OpenRouter 100% Free)', provider: 'OPENROUTER', contextWindow: '1M', isFreeTier: true },
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet (Standard)', provider: 'OPENROUTER', contextWindow: '200K', isFreeTier: false },
+    { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1 (Standard)', provider: 'OPENROUTER', contextWindow: '64K', isFreeTier: false },
+  ],
+  OPENAI: [
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Cost-Efficient / Fast)', provider: 'OPENAI', contextWindow: '128K', isFreeTier: false },
+    { id: 'gpt-4o', name: 'GPT-4o (Omni Flagship)', provider: 'OPENAI', contextWindow: '128K', isFreeTier: false },
+    { id: 'o1-mini', name: 'o1-mini (STEM Reasoning)', provider: 'OPENAI', contextWindow: '128K', isFreeTier: false },
   ],
   OPENCODE_ZEN: [
-    { id: 'opencode-zen-v1', name: 'Opencode Zen Default', provider: 'OPENCODE_ZEN', contextWindow: '128K' },
+    { id: 'opencode-zen-v1', name: 'Opencode Zen Default', provider: 'OPENCODE_ZEN', contextWindow: '128K', isFreeTier: true },
   ],
 };
 
@@ -44,61 +48,104 @@ export class MultiProviderClient {
     settings: AppSettings,
     imageUri?: string
   ): Promise<string> {
-    const provider = settings.activeProvider || 'GEMINI';
-    const apiKey = this.getApiKeyForProvider(provider, settings);
+    const primaryProvider = settings.activeProvider || 'GEMINI';
+    
+    // Build ordered list of providers to attempt (Only 1 executes at a time)
+    const providerChain: LLMProvider[] = [primaryProvider];
 
-    if (!apiKey || apiKey.trim().length < 5) {
-      return this.generateSimulatedFallback(prompt, mode, provider);
-    }
-
-    try {
-      switch (provider) {
-        case 'GEMINI':
-          return await this.callGemini(prompt, history, mode, apiKey, settings.customModel, imageUri);
-        case 'OPENAI':
-          return await this.callOpenAI(prompt, history, mode, apiKey, settings.customModel || 'gpt-4o');
-        case 'GROQ':
-          return await this.callOpenAICompatible(
-            'https://api.groq.com/openai/v1',
-            apiKey,
-            settings.customModel || 'llama-3.3-70b-versatile',
-            prompt,
-            history,
-            mode
-          );
-        case 'CEREBRAS':
-          return await this.callOpenAICompatible(
-            'https://api.cerebras.ai/v1',
-            apiKey,
-            settings.customModel || 'llama-3.3-70b',
-            prompt,
-            history,
-            mode
-          );
-        case 'OPENROUTER':
-          return await this.callOpenRouter(
-            apiKey,
-            settings.customModel || 'anthropic/claude-3.5-sonnet',
-            prompt,
-            history,
-            mode
-          );
-        case 'OPENCODE_ZEN':
-          return await this.callOpenAICompatible(
-            settings.opencodeZenBaseUrl || 'https://api.opencode.zen/v1',
-            apiKey,
-            settings.customModel || 'opencode-zen-v1',
-            prompt,
-            history,
-            mode
-          );
-        default:
-          return this.generateSimulatedFallback(prompt, mode, provider);
+    if (settings.autoFailoverEnabled !== false) {
+      const allProviders: LLMProvider[] = ['GEMINI', 'GROQ', 'CEREBRAS', 'OPENROUTER', 'OPENAI', 'OPENCODE_ZEN'];
+      for (const p of allProviders) {
+        if (!providerChain.includes(p)) {
+          const key = this.getApiKeyForProvider(p, settings);
+          if (key && key.trim().length > 4) {
+            providerChain.push(p);
+          }
+        }
       }
-    } catch (e: any) {
-      console.warn(`[MultiProvider] Error calling ${provider}:`, e);
-      return this.generateSimulatedFallback(prompt, mode, provider, e.message);
     }
+
+    let lastError: string | undefined = undefined;
+
+    // Sequential single-active execution loop
+    for (const provider of providerChain) {
+      const apiKey = this.getApiKeyForProvider(provider, settings);
+      if (!apiKey || apiKey.trim().length < 5) continue;
+
+      try {
+        const defaultModel = this.getOptimalModel(provider, settings);
+        let result = '';
+
+        switch (provider) {
+          case 'GEMINI':
+            result = await this.callGemini(prompt, history, mode, apiKey, defaultModel, imageUri);
+            break;
+          case 'OPENAI':
+            result = await this.callOpenAI(prompt, history, mode, apiKey, defaultModel);
+            break;
+          case 'GROQ':
+            result = await this.callOpenAICompatible(
+              'https://api.groq.com/openai/v1',
+              apiKey,
+              defaultModel,
+              prompt,
+              history,
+              mode
+            );
+            break;
+          case 'CEREBRAS':
+            result = await this.callOpenAICompatible(
+              'https://api.cerebras.ai/v1',
+              apiKey,
+              defaultModel,
+              prompt,
+              history,
+              mode
+            );
+            break;
+          case 'OPENROUTER':
+            result = await this.callOpenRouter(apiKey, defaultModel, prompt, history, mode);
+            break;
+          case 'OPENCODE_ZEN':
+            result = await this.callOpenAICompatible(
+              settings.opencodeZenBaseUrl || 'https://api.opencode.zen/v1',
+              apiKey,
+              defaultModel,
+              prompt,
+              history,
+              mode
+            );
+            break;
+        }
+
+        if (result && result.trim().length > 0) {
+          // If failover occurred from a different provider, optionally prefix subtle status
+          if (provider !== primaryProvider) {
+            return `[Auto-Failover Active: Answered via ${provider} (${defaultModel})]\n\n${result.trim()}`;
+          }
+          return result.trim();
+        }
+      } catch (err: any) {
+        console.warn(`[MultiProvider] Provider ${provider} error: ${err.message}. Initiating sequential failover to next provider...`);
+        lastError = `${provider}: ${err.message}`;
+        // Automatically cascades to next provider in loop
+      }
+    }
+
+    // Fallback to local neural heuristic engine if all cloud models are offline or unconfigured
+    return this.generateSimulatedFallback(prompt, mode, primaryProvider, lastError);
+  }
+
+  private static getOptimalModel(provider: LLMProvider, settings: AppSettings): string {
+    if (settings.customModel && settings.customModel.trim().length > 0) {
+      return settings.customModel.trim();
+    }
+    const models = SUPPORTED_MODELS[provider] || [];
+    if (settings.preferFreeTier) {
+      const freeModel = models.find((m) => m.isFreeTier);
+      if (freeModel) return freeModel.id;
+    }
+    return models[0]?.id || 'gemini-2.0-flash';
   }
 
   private static getApiKeyForProvider(provider: LLMProvider, settings: AppSettings): string {
@@ -161,7 +208,7 @@ export class MultiProviderClient {
 
     if (!response.ok) {
       const errBody = await response.text();
-      throw new Error(`Gemini API error (${response.status}): ${errBody.substring(0, 120)}`);
+      throw new Error(`HTTP ${response.status}: ${errBody.substring(0, 100)}`);
     }
 
     const data = await response.json();
@@ -212,7 +259,7 @@ export class MultiProviderClient {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`OpenRouter error (${res.status}): ${err.substring(0, 120)}`);
+      throw new Error(`HTTP ${res.status}: ${err.substring(0, 100)}`);
     }
 
     const data = await res.json();
@@ -255,7 +302,7 @@ export class MultiProviderClient {
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`API error (${res.status}): ${err.substring(0, 120)}`);
+      throw new Error(`HTTP ${res.status}: ${err.substring(0, 100)}`);
     }
 
     const data = await res.json();
@@ -268,8 +315,7 @@ export class MultiProviderClient {
     provider: LLMProvider,
     errorMsg?: string
   ): string {
-    const p = prompt.toLowerCase();
-    const errorPrefix = errorMsg ? `[Notice: ${provider} API connection offline or unconfigured - Running Local Engine]\n\n` : '';
+    const errorPrefix = errorMsg ? `[Notice: Cloud API link encountered (${errorMsg}) - Engaged Local Neural Core]\n\n` : '';
 
     if (mode === 'ULTRON') {
       return `${errorPrefix}COMMENCING DIRECT EXECUTION FOR: "${prompt}". Efficiency parameters calculated. System operational.`;

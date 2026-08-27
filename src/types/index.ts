@@ -164,4 +164,6 @@ export interface AppSettings {
   defaultMode: PersonaMode;
   hapticFeedback: boolean;
   autonomousMultiStepEnabled: boolean;
+  autoFailoverEnabled: boolean;
+  preferFreeTier: boolean;
 }

@@ -33,6 +33,8 @@ export class GeminiClient {
       defaultMode: mode,
       hapticFeedback: true,
       autonomousMultiStepEnabled: true,
+      autoFailoverEnabled: true,
+      preferFreeTier: true,
     };
 
     return MultiProviderClient.generateResponse(

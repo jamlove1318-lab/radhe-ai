@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultMode: 'JARVIS',
   hapticFeedback: true,
   autonomousMultiStepEnabled: true,
+  autoFailoverEnabled: true,
+  preferFreeTier: true,
 };
 
 class StorageService {
